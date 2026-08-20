@@ -1,0 +1,46 @@
+{
+  "source_file": "S_DOT_ENV_2026.07.27-08.02.csv",
+  "verification": {
+    "automated_tests": {
+      "command": "PYTHONPATH=src pytest -q",
+      "result": "10 passed"
+    },
+    "http_runtime": {
+      "server": "uvicorn public_sensor_ml_mvp.dashboard.app:app --host 127.0.0.1 --port 8000",
+      "health_status": 200,
+      "health_payload": {
+        "ok": true,
+        "source_file": "S_DOT_ENV_2026.07.27-08.02.csv"
+      },
+      "dashboard_status": 200,
+      "dashboard_html_bytes": 4861035,
+      "expected_content_found": [
+        "Public Sensor ML MVP",
+        "Ridge MAE",
+        "Top statistical anomaly candidates"
+      ]
+    },
+    "browser_render": {
+      "engine": "Playwright with system Chromium",
+      "self_contained_html_rendered": true,
+      "title": "Public Sensor ML MVP",
+      "expected_dashboard_text_found": true,
+      "full_page_screenshot_rendered": true
+    },
+    "playwright_running_url_capture": {
+      "verified": false,
+      "reason": "Current verification environment blocks Chromium navigation to localhost/127.0.0.1/0.0.0.0 with ERR_BLOCKED_BY_ADMINISTRATOR. curl HTTP checks succeed, so this is recorded as an environment-policy limitation rather than an application HTTP failure."
+    },
+    "docker_runtime": {
+      "verified": false,
+      "reason": "Docker CLI/runtime is not available in the current verification environment. Dockerfile and .dockerignore exist but have not been built or started."
+    }
+  },
+  "closure": {
+    "dashboard_http": "PASS",
+    "browser_render": "PASS",
+    "playwright_url_capture": "HOLD",
+    "docker_runtime": "HOLD",
+    "ready_to_show": "HOLD"
+  }
+}
