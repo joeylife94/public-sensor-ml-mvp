@@ -6,43 +6,68 @@ An independent, public-data-only proof project for building an end-to-end ML/Dat
 
 > Collect and validate public sensor data, generate time-series ML forecasts and anomaly signals, and expose the results through an executable dashboard.
 
-The intended MVP pipeline is:
+Target pipeline:
 
 `Public sensor data -> ingestion -> validation/cleaning -> time-series features -> short-horizon forecast -> anomaly detection -> evaluation -> dashboard -> reproducible proof screenshots`
 
 ## Current status
 
-**Scaffold only — NOT VERIFIED.**
+**Phase 1 — source-contract + ingestion/validation foundation. Overall proof level: NOT VERIFIED.**
 
-This repository currently defines project scope, independence rules, directory boundaries, data-source candidates, and MVP acceptance criteria. Ingestion, modeling, dashboard, Docker runtime, and Playwright proof capture are **not yet implemented**.
+Implemented and unit-tested:
+
+- public CSV loading with conservative encoding fallbacks;
+- source-column normalization without translating unknown schema;
+- documented `DATA_NO` correction precedence;
+- source profiling for columns, missingness, timestamps, numeric coverage, and duplicate measurement keys;
+- minimum validation for the provisional temperature-forecast question;
+- a CLI profile/validation script.
+
+Not yet verified against a real downloaded `OA-22833` CSV in this repository. Forecasting, anomaly detection, dashboard, Docker runtime, and Playwright proof capture are not implemented.
 
 ## Independence / clean-room rule
 
-This is a personal project created independently from any client or employer project.
+This repository is a personal project created independently from any client or employer project.
 
-The following are prohibited from being copied, adapted, or reused here:
+Prohibited from reuse:
 
-- client/company code or repository content
-- client/company data or derived datasets
-- client/company models, prompts, notebooks, documents, UI, screenshots, requirements, or deliverables
-- proprietary schemas, naming conventions, architecture, evaluation assets, or operational artifacts
-- the road-icing prediction problem definition
+- client/company code or repository content;
+- client/company data or derived datasets;
+- client/company models, prompts, notebooks, documents, UI, screenshots, requirements, or deliverables;
+- proprietary schemas, naming conventions, architecture, evaluation assets, or operational artifacts;
+- the road-icing prediction problem definition.
 
-Only publicly available data and independently created implementation/artifacts may be used.
+Only publicly available data and independently created implementation/artifacts may be used. Unknown provenance is treated as prohibited until verified.
 
-## Candidate public data
+## Public data source
 
-Initial candidate: **Seoul S-DoT (Smart Seoul Data of Things) public urban sensor data**, published through Seoul Open Data Plaza.
+Primary candidate: Seoul Metropolitan Government **S-DoT environmental information (real-time)**, dataset `OA-22833` on Seoul Open Data Plaza.
 
-Primary candidate dataset for source verification:
+Public documentation verifies roughly 1,170 sensors, hourly min/max/average environmental measurements, weekly CSV exports, and `DATA_NO` correction semantics. The exact current CSV schema and timezone semantics still require real-file profiling.
 
-- S-DoT environmental information (real-time): https://data.seoul.go.kr/dataList/OA-22833/S/1/datasetView.do
+See:
 
-Related historical/legacy dataset reference:
+- `docs/DATA_SOURCES.md`
+- `docs/SOURCE_CONTRACT.md`
 
-- S-DoT environmental information: https://data.seoul.go.kr/dataList/OA-15969/S/1/datasetView.do
+## Run the current source-profile gate
 
-The exact fields, cadence, access method, target variable, forecast horizon, and usable history will be confirmed before implementation. Data availability is not treated as verified until a reproducible fetch/profile is executed.
+After downloading a public S-DoT CSV from Seoul Open Data Plaza:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+
+PYTHONPATH=src python scripts/profile_sdot.py data/raw/<public-sdot-file>.csv \
+  --output data/processed/source_profile.json
+```
+
+Run unit tests:
+
+```bash
+PYTHONPATH=src pytest
+```
 
 ## MVP scope
 
@@ -57,17 +82,18 @@ The exact fields, cadence, access method, target variable, forecast horizon, and
 9. Docker execution environment
 10. Playwright-compatible proof screenshot flow
 
-Planned technologies are Python, Pandas, scikit-learn, Streamlit, Docker, and Playwright, subject to source-contract verification. No existing implementation is being copied into this repository.
+Candidate stack remains Python, Pandas, scikit-learn, Streamlit, Docker, and Playwright, but technologies are adopted only when required by this project's verified needs.
 
 ## Repository structure
 
 ```text
 .
 ├── README.md
-├── .gitignore
+├── pyproject.toml
 ├── docs/
 │   ├── PROJECT_MASTER.md
-│   └── DATA_SOURCES.md
+│   ├── DATA_SOURCES.md
+│   └── SOURCE_CONTRACT.md
 ├── src/public_sensor_ml_mvp/
 │   ├── ingestion/
 │   ├── validation/
@@ -79,23 +105,22 @@ Planned technologies are Python, Pandas, scikit-learn, Streamlit, Docker, and Pl
 ├── data/
 │   ├── raw/
 │   └── processed/
-├── proof/
-│   └── screenshots/
+├── proof/screenshots/
 └── scripts/
 ```
 
-Large/raw downloaded datasets are intentionally excluded from version control. Small, redistributable fixtures may be added later only when their source and usage terms are documented.
+Large downloaded datasets remain out of Git. Small fixtures may be added only when redistributable and source-attributed.
 
-## Authoritative project tracking
+## Authoritative tracking
 
-[`docs/PROJECT_MASTER.md`](docs/PROJECT_MASTER.md) is the authoritative tracking document for scope, status, acceptance criteria, evidence, and closure decisions in this repository.
+`docs/PROJECT_MASTER.md` is the authoritative tracking document for scope, status, evidence, and closure decisions.
 
 ## License
 
-No open-source license is added at initialization. Because this is a public proof repository, visibility does not automatically grant reuse rights. A license decision will be made before any intentional open-source release or external redistribution requirement.
+No repository-level open-source `LICENSE` is granted yet. Public repository visibility is not treated as an automatic license grant. Public dataset use follows the source dataset's own license and attribution rules.
 
-## Next work
+## Next 3 tasks
 
-1. Verify the S-DoT source contract and select the first measurable forecasting target/horizon.
-2. Implement reproducible ingestion plus schema/data-quality validation with tests.
-3. Establish leakage-safe time-series features, a baseline forecast, anomaly logic, and time-based evaluation before building the dashboard.
+1. Profile one real current `OA-22833` public CSV and close the remaining source-contract unknowns.
+2. Freeze the first forecasting target/horizon and implement deterministic normalized output plus real-data validation evidence.
+3. Build leakage-safe chronological baseline forecasting and anomaly scoring only after the source gate passes.

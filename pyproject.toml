@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "public-sensor-ml-mvp"
+version = "0.1.0"
+description = "Independent public-data ML/Data proof project for urban sensor time series"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"

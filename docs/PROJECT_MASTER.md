@@ -2,15 +2,16 @@
 
 **Role:** Authoritative project tracking document  
 **Repository:** `joeylife94/public-sensor-ml-mvp`  
-**Proof level:** NOT VERIFIED  
-**Current phase:** Phase 0 — independent scaffold  
-**Initialization gate:** PASS (scope/docs/repository structure only; no functional MVP claim)
+**Overall proof level:** NOT VERIFIED  
+**Current phase:** Phase 1 — source-contract + ingestion/validation foundation  
+**Phase 0 scaffold gate:** PASS  
+**Phase 1 real-data gate:** HOLD
 
 ---
 
-## 1. Project Objective
+## 1. Objective
 
-Build an independent, public-data-only ML/Data MVP that demonstrates an end-to-end system:
+Build an independent, public-data-only proof asset demonstrating:
 
 `public urban sensor data -> ingestion -> validation/cleaning -> time-series features -> short-horizon forecast -> anomaly detection -> time-based evaluation -> dashboard -> reproducible proof capture`
 
@@ -18,260 +19,234 @@ Buyer-facing outcome:
 
 > A runnable end-to-end ML/Data system that collects and validates public sensor data, produces time-series forecasting and anomaly-detection results, and exposes them through a dashboard.
 
-The goal is not to maximize features. The goal is a small, reproducible, independently verifiable proof asset.
+The project closes the smallest useful proof. It does not expand for portfolio volume.
 
 ---
 
-## 2. Independence / Clean-Room Boundary
+## 2. Clean-room boundary
 
-This repository is a personal project and must remain completely independent from any client or employer project.
+This repository is completely independent from client/employer work.
 
-### Prohibited reuse
+### Prohibited
 
-Do not copy, adapt, translate, reconstruct, or reuse:
+- client/company source code, repositories, datasets, derived data, models, checkpoints, prompts, notebooks, metrics;
+- client/company requirements, documents, UI, screenshots, diagrams, reports, or deliverables;
+- proprietary schemas, architecture artifacts, operational workflows, naming conventions, or hidden assumptions;
+- the road-icing prediction problem definition.
 
-- client/company source code or repository content
-- client/company datasets or derived data
-- client/company model files, checkpoints, prompts, notebooks, evaluation sets, or metrics
-- client/company documents, requirements, UI, screenshots, diagrams, reports, or deliverables
-- proprietary schemas, naming conventions, operational workflows, architecture artifacts, or internal assumptions
-- the road-icing prediction problem definition
+### Allowed
 
-### Allowed inputs
+- publicly accessible datasets and APIs;
+- independently written code/documentation;
+- open-source libraries under their licenses;
+- independently designed UI, evaluation, and proof assets.
 
-- publicly accessible datasets
-- publicly documented APIs
-- independently written code and documentation
-- open-source libraries used under their applicable licenses
-- independently designed UI, evaluation, and proof assets
-
-### Verification rule
-
-If provenance is unclear, treat the asset as prohibited until its public origin and usage rights are confirmed.
+If provenance is unclear, the asset is prohibited until independently verified.
 
 ---
 
-## 3. Public Data Source
+## 3. Source contract
 
-Initial candidate source: Seoul S-DoT public urban sensor data from Seoul Open Data Plaza.
+Primary source: Seoul S-DoT environmental information (real-time), dataset `OA-22833`.
 
-- Primary source candidate: S-DoT environmental information (real-time), dataset `OA-22833`
-- Historical/legacy reference: S-DoT environmental information, dataset `OA-15969`
-- Source documentation: `docs/DATA_SOURCES.md`
+### Verified from official public documentation
 
-As of initialization, the source is a **candidate**, not a verified ingestion contract. Exact schema, timestamp semantics, cadence, API/file access behavior, retention/history, target variable, and forecast horizon must be profiled from public data before modeling.
+- publisher: Seoul Metropolitan Government;
+- approximately 1,170 sensors;
+- hourly environmental minimum/maximum/average measurements;
+- weekly CSV exports;
+- public-data license: Korea Open Government License Type 1 / attribution;
+- delayed/corrected data may exist;
+- `DATA_NO=1` = real-time collection;
+- `DATA_NO=2` = delayed/corrected record;
+- for the same sensor + measurement time, `DATA_NO=2` is final when both 1 and 2 exist.
 
----
+### Not yet verified from a current real file
 
-## 4. MVP Scope
+- exact `OA-22833` CSV columns;
+- timestamp format/timezone semantics;
+- current sensor identifier field(s);
+- missing-value conventions and observed rates;
+- duplicate/correction frequency;
+- cadence gaps;
+- final target/horizon suitability.
 
-1. Public sensor-data ingestion
-2. Cleaning and validation
-3. Time-series feature generation
-4. Short-horizon forecasting
-5. Anomaly-state detection
-6. Time-based train/validation
-7. Model evaluation
-8. Dashboard
-9. Docker execution environment
-10. Playwright-compatible proof screenshot flow
+Legacy `OA-15969` documents `IotVdata017` and fields such as `SN`, `MDL_NO`, `MSRMT_HR`, `AVG_TP`, `AVG_HUM`, `AVG_WSPD`, and `AVG_INILLU`. That schema is reference-only until current real-time data is observed.
 
-### Explicit non-goals for the first MVP
-
-- production-grade orchestration
-- cloud infrastructure
-- user authentication
-- large-model or deep-learning complexity without evidence it is needed
-- proprietary data integration
-- geospatial optimization unrelated to the selected public-data question
-- road-icing prediction
-- portfolio feature expansion beyond the proof requirement
+See `docs/SOURCE_CONTRACT.md` and `docs/DATA_SOURCES.md`.
 
 ---
 
-## 5. Planned Technical Direction
+## 4. Current implementation
 
-Candidate stack, to be confirmed after source-contract verification:
+### Changed
 
-- Python
-- Pandas
-- scikit-learn
-- Streamlit
-- Docker
-- Playwright
+- added `pyproject.toml`;
+- implemented conservative S-DoT CSV loader;
+- implemented column normalization preserving unknown fields;
+- implemented documented `DATA_NO` final-record resolution;
+- implemented profiling/validation report;
+- added `scripts/profile_sdot.py`;
+- added unit tests for correction precedence, no-silent-dedup behavior, column normalization, missing target, invalid timestamps, and duplicates;
+- updated public-source documentation.
 
-Technology choices must be justified by this project's requirements. No existing implementation is to be copied into this repository.
+### Executed
 
----
-
-## 6. Repository Boundaries
+Local verification environment executed:
 
 ```text
-src/public_sensor_ml_mvp/ingestion/   # public-source retrieval and normalization
-src/public_sensor_ml_mvp/validation/  # schema and quality checks
-src/public_sensor_ml_mvp/features/    # leakage-safe time-series features
-src/public_sensor_ml_mvp/forecasting/ # baseline and selected forecasting model
-src/public_sensor_ml_mvp/anomaly/     # anomaly scoring/state logic
-src/public_sensor_ml_mvp/dashboard/   # Streamlit presentation layer
-tests/                                # automated tests
-data/raw/                             # local-only raw public downloads
-data/processed/                       # local-only processed artifacts
-proof/screenshots/                    # buyer-facing proof captures
-scripts/                              # reproducible run/proof helper scripts
+PYTHONPATH=src pytest -q
+....... [100%]
+7 passed
 ```
 
-Large downloaded datasets are not committed. Any future sample fixture must be small, redistributable, and source-attributed.
+Also executed the profile CLI against an independently created synthetic fixture containing `SN`, `MSRMT_HR`, `DATA_NO`, `AVG_TP`, and `AVG_HUM`. The script returned validation `ok=true` and removed one `DATA_NO=1` row when the same sensor/time had a `DATA_NO=2` corrected row.
+
+### Verified
+
+- ingestion/validation code behavior against synthetic fixtures;
+- `DATA_NO=2` precedence implementation matches the public documentation rule;
+- validation fails on missing candidate target and invalid timestamps;
+- duplicates without `DATA_NO` are surfaced rather than silently resolved.
+
+### Not verified
+
+- current public CSV fetch/download automation;
+- current `OA-22833` real file schema;
+- real-data row quality, cadence, missingness, and correction rate;
+- final forecasting target/horizon;
+- all model/dashboard/Docker/Playwright functionality.
+
+### Closure
+
+**HOLD** — source metadata/code foundation is sufficient, but Phase 1 cannot PASS until one current public `OA-22833` CSV is profiled and the source contract is frozen from observed evidence.
 
 ---
 
-## 7. MVP Definition of Done
+## 5. Provisional ML question
 
-The MVP is **DONE only when every required item below is independently verified with evidence**.
+Candidate only:
+
+- target: hourly average temperature (`AVG_TP` or current documented equivalent);
+- horizon: +1 hour;
+- unit of prediction: per sensor;
+- split: chronological only.
+
+Do not promote this to the accepted target until the real-file source gate passes.
+
+---
+
+## 6. MVP Definition of Done
 
 ### A. Ingestion
 
-- [ ] A documented public source is fetched reproducibly from a clean environment.
-- [ ] Source URL/dataset ID, retrieval time, and raw file/API provenance are recorded.
-- [ ] No proprietary or client-derived input is present.
+- [ ] A current documented public source is ingested reproducibly from a clean environment.
+- [ ] Source ID, retrieval method/date, and provenance are recorded.
+- [x] No proprietary/client input is permitted by repository rules.
 
-### B. Cleaning and validation
+### B. Cleaning / validation
 
-- [ ] Schema expectations are explicit.
-- [ ] Timestamp parsing/timezone behavior is tested.
-- [ ] Duplicate, missing, invalid-range, and ordering checks run reproducibly.
-- [ ] Validation produces a clear pass/fail or quality report.
+- [ ] Current real schema is recorded from observed public data.
+- [ ] Timestamp/timezone behavior is verified.
+- [x] Duplicate/correction handling exists for documented `DATA_NO` semantics.
+- [x] Missing/invalid candidate fields produce explicit validation output.
+- [ ] Real-data validation report is captured.
 
 ### C. Time-series features
 
-- [ ] Lag/rolling/calendar features are defined from past information only.
-- [ ] Feature generation is deterministic.
-- [ ] Leakage checks cover the selected target/horizon.
+- [ ] Past-only lag/rolling/calendar features.
+- [ ] Deterministic generation.
+- [ ] Leakage checks for selected target/horizon.
 
 ### D. Forecasting
 
-- [ ] One clearly defined short-horizon target is selected from the public dataset.
-- [ ] A naive baseline exists.
-- [ ] At least one independently implemented ML model is evaluated against the baseline.
+- [ ] Final short-horizon target selected from observed public data.
+- [ ] Naive baseline.
+- [ ] At least one independent ML model evaluated against baseline.
 
 ### E. Anomaly detection
 
-- [ ] Anomaly definition is explicit and independent of proprietary requirements.
-- [ ] The system produces reproducible anomaly scores or states.
-- [ ] Example anomalies can be traced back to source observations.
+- [ ] Explicit independent anomaly definition.
+- [ ] Reproducible anomaly score/state.
+- [ ] Examples trace to public observations.
 
 ### F. Time-based train/validation
 
-- [ ] Train/validation boundaries are chronological.
-- [ ] No randomized split is used for the primary time-series claim.
-- [ ] Evaluation period and sample counts are recorded.
+- [ ] Chronological boundaries.
+- [ ] No randomized split for primary time-series claim.
+- [ ] Evaluation period/sample counts recorded.
 
-### G. Model evaluation
+### G. Evaluation
 
-- [ ] Forecast metrics are appropriate to the selected target and documented.
-- [ ] Baseline-vs-model results are reproducible.
-- [ ] Known limitations and failure cases are recorded.
+- [ ] Metrics documented and appropriate.
+- [ ] Baseline-vs-model results reproducible.
+- [ ] Limitations/failure cases recorded.
 
 ### H. Dashboard
 
-- [ ] Dashboard starts from documented commands.
-- [ ] It displays source data context, forecast output, anomaly output, and evaluation context.
-- [ ] UI contains no reused client/company assets.
+- [ ] Starts from documented command.
+- [ ] Displays source context, forecast, anomalies, evaluation context.
+- [ ] Contains no reused client/company assets.
 
 ### I. Docker
 
-- [ ] A clean Docker build succeeds.
-- [ ] The MVP starts from the documented Docker command.
-- [ ] Required configuration/secrets are externalized.
+- [ ] Clean build succeeds.
+- [ ] MVP starts with documented Docker command.
+- [ ] Configuration/secrets externalized.
 
 ### J. Proof screenshot flow
 
-- [ ] Playwright can open the running dashboard.
-- [ ] A deterministic proof route/state is available.
-- [ ] Screenshot generation is scriptable and reproducible.
-- [ ] Public-facing screenshot contains no proprietary information.
+- [ ] Playwright opens running dashboard.
+- [ ] Deterministic proof state exists.
+- [ ] Screenshots are reproducible and public-safe.
 
 ### K. Proof package
 
-- [ ] README setup is accurate.
-- [ ] Actual execution commands and results are recorded.
-- [ ] Evidence distinguishes VERIFIED from NOT VERIFIED items.
-- [ ] Known limitations and what was not tested are visible.
+- [ ] README setup matches reality.
+- [ ] Actual execution evidence recorded.
+- [ ] VERIFIED and NOT VERIFIED claims remain distinct.
+- [ ] Known limitations visible.
 
-### Closure condition
-
-**READY TO SHOW** requires all MVP DoD items above plus a stable buyer-facing narrative and reproducible public evidence. Until then, the project remains **NOT VERIFIED** or **VERIFIED** only for explicitly tested components.
+**READY TO SHOW** requires all MVP DoD items plus stable buyer-facing narrative/evidence.
 
 ---
 
-## 8. Current Status
+## 7. Next 3 tasks
 
-| Area | Status | Evidence |
-|---|---|---|
-| Repository created | VERIFIED | GitHub repository exists |
-| README / scope | VERIFIED | `README.md` |
-| Independence rule | VERIFIED | README + this document |
-| Public source candidate recorded | VERIFIED | `docs/DATA_SOURCES.md` |
-| Ingestion | NOT VERIFIED | Not implemented |
-| Validation | NOT VERIFIED | Not implemented |
-| Features | NOT VERIFIED | Not implemented |
-| Forecasting | NOT VERIFIED | Not implemented |
-| Anomaly detection | NOT VERIFIED | Not implemented |
-| Time-based evaluation | NOT VERIFIED | Not implemented |
-| Dashboard | NOT VERIFIED | Not implemented |
-| Docker | NOT VERIFIED | Not implemented |
-| Playwright proof capture | NOT VERIFIED | Not implemented |
+### Task 1 — Real public CSV profile
 
----
+Download one current `OA-22833` weekly CSV from Seoul Open Data Plaza and run `scripts/profile_sdot.py`.
 
-## 9. Next 3 Tasks
+**Closure:** exact observed columns, identifiers, timestamp semantics, missingness, correction frequency, and coverage recorded.
 
-### Task 1 — Verify source contract and define the first prediction question
+### Task 2 — Freeze source contract + deterministic normalized dataset
 
-- inspect the current S-DoT public dataset/API directly
-- record fields, units, timestamp semantics, cadence, duplicate/final-record semantics, usable history, and access limits
-- choose one target variable and a short forecast horizon based on observed data quality
-- produce a small public-data profile and data contract
+Update the schema contract from observed evidence, select the final target/horizon, and produce a deterministic normalized output path with real-data validation evidence.
 
-**Closure:** target/horizon and source contract are evidence-backed; no model work before this gate.
+**Closure:** Phase 1 PASS.
 
-### Task 2 — Implement ingestion + validation
+### Task 3 — Baseline modeling
 
-- reproducible public-source fetch/load path
-- deterministic normalization
-- schema, timestamp, duplicates, missingness, and range checks
-- minimal automated tests
+Implement past-only features, chronological split, naive forecast baseline, first scikit-learn model, and simple independently defined anomaly scoring.
 
-**Closure:** clean-environment fetch/validate run passes on a documented public sample.
-
-### Task 3 — Establish modeling baseline
-
-- leakage-safe time features
-- chronological split
-- naive baseline
-- first scikit-learn forecast model
-- simple anomaly scoring method
-- reproducible evaluation artifact
-
-**Closure:** baseline results are reproducible and limitations are explicit; dashboard work begins only after this gate.
+**Closure:** reproducible evaluation beats or contextualizes baseline; limitations explicit.
 
 ---
 
-## 10. License Decision
+## 8. License decision
 
-No `LICENSE` file is included at initialization.
-
-Reason: this is initially a public proof repository, not an explicit open-source grant. Public GitHub visibility and open-source licensing are separate decisions. Revisit licensing before intentional third-party reuse, distribution, or packaged release.
+No repository-level `LICENSE` file yet. Public visibility does not itself grant reuse rights. Revisit before intentional open-source distribution. Dataset usage must retain the source's attribution requirements.
 
 ---
 
-## 11. Change Discipline
+## 9. Change discipline
 
-For every meaningful project update, record:
+Every meaningful update records:
 
-- **Changed** — files/behavior changed
-- **Executed** — commands/tests actually run
-- **Verified** — claims supported by evidence
-- **Not Verified** — remaining untested assumptions
-- **Closure** — PASS / HOLD / FAIL / DEFER / FREEZE
+- **Changed**
+- **Executed**
+- **Verified**
+- **Not Verified**
+- **Closure:** PASS / HOLD / FAIL / DEFER / FREEZE
 
-Do not mark planned functionality as implemented. Do not treat an agent self-report as final proof.
+Never mark planned functionality complete. Agent self-report is not final proof.
