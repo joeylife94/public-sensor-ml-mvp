@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/source-contract-ingestion
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
