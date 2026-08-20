@@ -2,81 +2,99 @@
 
 ## Status
 
-**PARTIALLY VERIFIED** — public metadata and correction semantics are verified from official Seoul sources. The exact 2026 real-time CSV column set and timestamp timezone semantics have not yet been observed by this repository, so they remain NOT VERIFIED.
+**REAL-FILE VERIFIED for the first weekly MVP source.**
 
-## Authoritative public source
+Verified source file:
 
-- Publisher: Seoul Metropolitan Government
-- Portal: Seoul Open Data Plaza
-- Dataset: Smart Seoul Data of Things (S-DoT) environmental information (real-time)
+- Dataset: Seoul S-DoT environmental information (real-time)
 - Dataset ID: `OA-22833`
-- Public dataset page: `https://data.seoul.go.kr/dataList/OA-22833/S/1/datasetView.do`
-- Public Data Portal mirror/metadata: `https://www.data.go.kr/data/15157504/openapi.do`
-- License shown by Seoul Open Data Plaza: Korea Open Government License Type 1 (attribution; commercial use and modification permitted)
+- File: `S_DOT_ENV_2026.07.27-08.02.csv`
+- File size: `45,773,209` bytes
+- SHA-256: `428dcbda91ca1bdbfe0966fa4a9ca0f5f399348e745acfeb113bd9119d959709`
+- Observed encoding: `cp949`
+- Rows: `195,984`
+- Columns: `59`
+- Sensors: `1,166`
 
-## Verified metadata
+This contract is derived from the public file itself plus official Seoul dataset metadata. It does not reuse any client/company schema or artifact.
 
-Official dataset documentation states:
+## Observed current schema
 
-- approximately 1,170 sensors are deployed across Seoul;
-- measurements include environmental data such as temperature and humidity;
-- measurements are represented as hourly minimum, maximum, and average values;
-- the real-time dataset is updated continuously/real-time;
-- weekly CSV exports are published on the dataset page;
-- communications delay, failures, and construction at sensor locations can cause delayed or corrected data;
-- `DATA_NO=1` means real-time collected data;
-- `DATA_NO=2` means delayed/corrected data;
-- when `DATA_NO=1` and `DATA_NO=2` coexist for the same sensor and measurement time, `DATA_NO=2` is the final measurement.
+The current file uses Korean headers. The MVP canonicalizes only unambiguous fields required for the first forecasting question:
 
-## Historical / legacy schema reference
+| Raw header | Canonical field |
+|---|---|
+| 모델명 | `MDL_NO` |
+| 시리얼 | `SN` |
+| 센서 시간 | `MSRMT_HR` |
+| 지역구분 | `RGN` |
+| 자치구역 | `CGG` |
+| 행정구역 | `DONG` |
+| 최대 기온 | `MAX_TP` |
+| 평균 기온 | `AVG_TP` |
+| 최소 기온 | `MIN_TP` |
+| 최대 상대습도 | `MAX_HUM` |
+| 평균 상대습도 | `AVG_HUM` |
+| 최소 상대습도 | `MIN_HUM` |
+| 데이터수집시간 | `COLLECTED_AT` |
+| 데이터구분번호 | `DATA_NO` |
 
-Legacy dataset `OA-15969` documents OpenAPI service `IotVdata017` and the following fields:
+The raw CSV repeats some labels, including wind-related headers and black-globe-temperature headers. Pandas mangles duplicates with `.1`. These ambiguous fields are deliberately preserved rather than guessed.
 
-`MDL_NO`, `SN`, `MSRMT_HR`, `RGN`, `CGG`, `DONG`, `MAX_TP`, `AVG_TP`, `MIN_TP`, `MAX_HUM`, `AVG_HUM`, `MIN_HUM`, `MAX_WSPD`, `AVG_WSPD`, `MIN_WSPD`, `MAX_WD`, `AVG_WD`, `MIN_WD`, `MAX_INILLU`, `AVG_INILLU`, `MIN_INILLU`.
+## Timestamp contract
 
-This legacy schema is useful only as a **reference**. The repository must not assume that the current `OA-22833` real-time CSV/API schema is identical until a current public file is profiled.
+Two `센서 시간` spellings were observed:
 
-## Current ingestion decision
+- `YYYY-MM-DD_HH:MM:SS`
+- `YYYY-MM-DD_HH-MM-SS`
 
-The first implementation uses the **public CSV export path**, not an unverified current API contract.
+All `195,984` observed sensor timestamps parse after normalization.
 
-Reasons:
+The source encodes no timezone offset. The MVP uses timezone-naive local wall-clock chronology and does not claim a verified UTC conversion.
 
-1. the current dataset page explicitly publishes weekly CSV files;
-2. full dataset inspection is better suited to CSV than the portal's limited sheet preview;
-3. this avoids inventing an API service name or field contract for `OA-22833`;
-4. the CSV loader can be tested independently while preserving unknown source columns.
+Observed range:
 
-## Candidate ML question
+- sensor time: `2026-07-26 00:00:00` to `2026-08-02 23:07:00`
+- collection time: `2026-07-27 00:07:15` to `2026-08-02 23:08:01`
 
-**Provisional only:** 1-hour-ahead prediction of hourly average temperature (`AVG_TP`) per sensor.
+Some sensor clocks lag collection time materially. Only `75.95%` of rows are collected within 30 minutes after sensor time. Modeling therefore filters clock-aligned rows.
 
-This is not yet accepted as the final target. It becomes accepted only after a real `OA-22833` public CSV profile verifies:
+## Cadence and quality
 
-- `AVG_TP` (or an explicitly documented equivalent) exists;
-- a stable sensor identifier exists;
-- timestamps are parseable and sufficiently regular;
-- missingness and history are adequate for chronological training/evaluation.
+- median per-sensor cadence: `60` minutes
+- p95 cadence: `60` minutes
+- exact 60-minute intervals: `98.66%`
+- intervals within 55-65 minutes: `99.81%`
+- duplicate sensor+timestamp rows: `0`
+- `DATA_NO=1`: `195,984`
+- `DATA_NO=2`: `0` in this weekly file
 
-## Required real-file verification gate
+The documented `DATA_NO=2` correction-precedence rule remains implemented for future files even though no correction rows appeared in this sample.
 
-Before baseline modeling starts, run:
+## Target suitability
 
-```bash
-PYTHONPATH=src python scripts/profile_sdot.py data/raw/<public-sdot-file>.csv \
-  --output data/processed/source_profile.json
-```
+Observed `AVG_TP`:
 
-The resulting profile must be reviewed for:
+- numeric coverage: `91.24%`
+- missing/non-numeric: `8.76%`
+- range: `19.0°C` to `42.8°C`
+- non-numeric sentinel strings include `*****` and `******`
 
-- observed column names;
-- sensor identifier(s);
-- timestamp parse rate, minimum/maximum, cadence, and timezone semantics;
-- `DATA_NO` values and duplicate/correction behavior;
-- `AVG_TP` numeric coverage and missingness;
-- any columns not present in the legacy reference;
-- actual historical coverage of the selected files.
+Accepted first ML question:
 
-## Non-negotiable provenance rule
+> **Per-sensor 1-hour-ahead prediction of hourly average temperature (`AVG_TP`).**
 
-No client/company code, data, model, requirement, schema, UI, screenshot, evaluation artifact, or derived sample may be used to fill gaps in this source contract. Unknowns remain unknown until verified from public sources or public files.
+First reproducible baseline cohort requires:
+
+- numeric `AVG_TP` and `AVG_HUM`;
+- collection delay between 0 and 30 minutes;
+- one unique sensor-hour row;
+- a complete 168-hour weekly sequence.
+
+This yields `672` sensors.
+
+## License / provenance
+
+Source publisher: Seoul Metropolitan Government / Seoul Open Data Plaza. Dataset use follows the source's Korea Open Government License Type 1 attribution requirement.
+
+No proprietary/client data, requirements, code, UI, model, screenshot, or derived sample is used.
