@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local data artifacts
+/data/raw/*
+!/data/raw/.gitkeep
+/data/processed/*
+!/data/processed/.gitkeep
+*.parquet
+*.feather
+
+# Local model / experiment artifacts
+/models/
+/artifacts/
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Playwright/runtime output
+playwright-report/
+test-results/
+
+# Local logs
+*.log
