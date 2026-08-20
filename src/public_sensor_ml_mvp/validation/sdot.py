@@ -36,11 +36,36 @@ class SdotValidationReport:
         return payload
 
 
+def _sensor_columns(frame: pd.DataFrame) -> list[str]:
+    return [column for column in ("SN", "MDL_NO") if column in frame.columns]
+
+
 def _duplicate_key(frame: pd.DataFrame) -> list[str]:
-    sensor_keys = [column for column in ("SN", "MDL_NO") if column in frame.columns]
+    sensor_keys = _sensor_columns(frame)
     if "MSRMT_HR" in frame.columns and sensor_keys:
         return [*sensor_keys, "MSRMT_HR"]
     return []
+
+
+def _cadence_minutes(frame: pd.DataFrame) -> pd.Series:
+    sensor_keys = _sensor_columns(frame)
+    if not sensor_keys or "MSRMT_HR" not in frame.columns:
+        return pd.Series(dtype="float64")
+
+    working = frame[[*sensor_keys, "MSRMT_HR"]].copy()
+    working["__ts"] = pd.to_datetime(working["MSRMT_HR"], errors="coerce")
+    working = working.dropna(subset=["__ts"]).drop_duplicates(subset=[*sensor_keys, "__ts"])
+    if working.empty:
+        return pd.Series(dtype="float64")
+
+    working = working.sort_values([*sensor_keys, "__ts"], kind="stable")
+    return (
+        working.groupby(sensor_keys, dropna=False)["__ts"]
+        .diff()
+        .dt.total_seconds()
+        .div(60)
+        .dropna()
+    )
 
 
 def profile_sdot_frame(frame: pd.DataFrame) -> dict[str, Any]:
@@ -53,16 +78,26 @@ def profile_sdot_frame(frame: pd.DataFrame) -> dict[str, Any]:
         },
     }
 
+    sensor_keys = _sensor_columns(frame)
+    if sensor_keys:
+        profile["sensor_identifier_columns"] = sensor_keys
+        profile["unique_sensor_count"] = int(frame[sensor_keys].drop_duplicates().shape[0])
+
     key = _duplicate_key(frame)
     if key:
         profile["measurement_key"] = key
         profile["duplicate_measurement_rows"] = int(frame.duplicated(subset=key, keep=False).sum())
 
     if "DATA_NO" in frame.columns:
+        numeric_data_no = pd.to_numeric(frame["DATA_NO"], errors="coerce")
         profile["data_no_counts"] = {
             str(key): int(value)
-            for key, value in frame["DATA_NO"].value_counts(dropna=False).to_dict().items()
+            for key, value in numeric_data_no.value_counts(dropna=False).to_dict().items()
         }
+        profile["corrected_record_rows"] = int((numeric_data_no == 2).sum())
+        profile["corrected_record_fraction"] = (
+            float((numeric_data_no == 2).mean()) if len(frame) else 0.0
+        )
 
     if "MSRMT_HR" in frame.columns:
         parsed = pd.to_datetime(frame["MSRMT_HR"], errors="coerce")
@@ -71,6 +106,12 @@ def profile_sdot_frame(frame: pd.DataFrame) -> dict[str, Any]:
         if not valid.empty:
             profile["timestamp_min"] = valid.min().isoformat()
             profile["timestamp_max"] = valid.max().isoformat()
+
+        cadence = _cadence_minutes(frame)
+        if not cadence.empty:
+            profile["cadence_minutes_median"] = float(cadence.median())
+            profile["cadence_minutes_p95"] = float(cadence.quantile(0.95))
+            profile["cadence_one_hour_fraction"] = float(cadence.eq(60.0).mean())
 
     for column in ("AVG_TP", "AVG_HUM", "AVG_WSPD", "AVG_INILLU"):
         if column in frame.columns:
@@ -102,7 +143,9 @@ def validate_sdot_frame(frame: pd.DataFrame) -> SdotValidationReport:
         bad_timestamps = int(parsed.isna().sum())
         if bad_timestamps:
             errors.append(f"Unparseable MSRMT_HR rows: {bad_timestamps}")
-        warnings.append("MSRMT_HR timezone semantics are not yet source-verified; timestamps remain timezone-naive")
+        warnings.append(
+            "MSRMT_HR timezone semantics are not yet source-verified; timestamps remain timezone-naive"
+        )
 
     if "AVG_TP" in frame.columns:
         numeric = pd.to_numeric(frame["AVG_TP"], errors="coerce")
@@ -131,7 +174,9 @@ def validate_sdot_frame(frame: pd.DataFrame) -> SdotValidationReport:
     unknown = sorted(set(frame.columns).difference(LEGACY_DOCUMENTED_COLUMNS | {"DATA_NO"}))
     if unknown:
         metrics["columns_not_in_legacy_contract"] = unknown
-        warnings.append("Observed columns differ from the legacy documented schema; do not assume schema equivalence")
+        warnings.append(
+            "Observed columns differ from the legacy documented schema; do not assume schema equivalence"
+        )
 
     return SdotValidationReport(
         row_count=int(len(frame)),

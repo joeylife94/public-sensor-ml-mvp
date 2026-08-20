@@ -19,7 +19,7 @@ Buyer-facing outcome:
 
 > A runnable end-to-end ML/Data system that collects and validates public sensor data, produces time-series forecasting and anomaly-detection results, and exposes them through a dashboard.
 
-The project closes the smallest useful proof. It does not expand for portfolio volume.
+The target is the smallest useful, reproducible proof. Do not expand scope for portfolio volume.
 
 ---
 
@@ -41,7 +41,7 @@ This repository is completely independent from client/employer work.
 - open-source libraries under their licenses;
 - independently designed UI, evaluation, and proof assets.
 
-If provenance is unclear, the asset is prohibited until independently verified.
+If provenance is unclear, treat the asset as prohibited until independently verified.
 
 ---
 
@@ -49,31 +49,29 @@ If provenance is unclear, the asset is prohibited until independently verified.
 
 Primary source: Seoul S-DoT environmental information (real-time), dataset `OA-22833`.
 
-### Verified from official public documentation
+### Verified from official public metadata
 
 - publisher: Seoul Metropolitan Government;
 - approximately 1,170 sensors;
 - hourly environmental minimum/maximum/average measurements;
 - weekly CSV exports;
-- public-data license: Korea Open Government License Type 1 / attribution;
-- delayed/corrected data may exist;
+- Korea Open Government License Type 1 / attribution;
 - `DATA_NO=1` = real-time collection;
 - `DATA_NO=2` = delayed/corrected record;
-- for the same sensor + measurement time, `DATA_NO=2` is final when both 1 and 2 exist.
+- `DATA_NO=2` is final when 1 and 2 coexist for the same sensor and measurement time;
+- dataset update date observed on 2026-08-20: `2026-08-10`;
+- latest weekly file visible on that date: `S_DOT_ENV_2026.07.27-08.02.csv` (44.7 MB, modified 2026-08-10).
 
-### Not yet verified from a current real file
+### Not yet verified from a current real CSV
 
-- exact `OA-22833` CSV columns;
+- exact `OA-22833` column set;
 - timestamp format/timezone semantics;
 - current sensor identifier field(s);
-- missing-value conventions and observed rates;
-- duplicate/correction frequency;
-- cadence gaps;
-- final target/horizon suitability.
+- actual missing-value conventions/rates;
+- cadence gaps and correction frequency;
+- final forecasting target/horizon suitability.
 
-Legacy `OA-15969` documents `IotVdata017` and fields such as `SN`, `MDL_NO`, `MSRMT_HR`, `AVG_TP`, `AVG_HUM`, `AVG_WSPD`, and `AVG_INILLU`. That schema is reference-only until current real-time data is observed.
-
-See `docs/SOURCE_CONTRACT.md` and `docs/DATA_SOURCES.md`.
+Legacy `OA-15969` / `IotVdata017` is reference-only and must not be treated as the current contract.
 
 ---
 
@@ -81,45 +79,56 @@ See `docs/SOURCE_CONTRACT.md` and `docs/DATA_SOURCES.md`.
 
 ### Changed
 
-- added `pyproject.toml`;
-- implemented conservative S-DoT CSV loader;
-- implemented column normalization preserving unknown fields;
-- implemented documented `DATA_NO` final-record resolution;
-- implemented profiling/validation report;
-- added `scripts/profile_sdot.py`;
-- added unit tests for correction precedence, no-silent-dedup behavior, column normalization, missing target, invalid timestamps, and duplicates;
-- updated public-source documentation.
+- public CSV loader with encoding fallbacks;
+- source-column normalization preserving unknown fields;
+- documented `DATA_NO` final-record resolution;
+- validation/profiling for columns, missingness, numeric coverage, timestamps, and duplicate keys;
+- profiler now records sensor identifier columns and unique sensor count;
+- profiler now records median/p95 cadence and one-hour cadence fraction;
+- profiler now records corrected-record count/fraction;
+- profile CLI now records dataset ID, source URL, filename, file size, SHA-256, optional retrieval timestamp, and profile-generation timestamp;
+- source documentation updated with current official listing metadata.
 
 ### Executed
 
-Local verification environment executed:
+Local verification executed against independently created synthetic fixtures:
 
 ```text
 PYTHONPATH=src pytest -q
-....... [100%]
-7 passed
+........ [100%]
+8 passed
 ```
 
-Also executed the profile CLI against an independently created synthetic fixture containing `SN`, `MSRMT_HR`, `DATA_NO`, `AVG_TP`, and `AVG_HUM`. The script returned validation `ok=true` and removed one `DATA_NO=1` row when the same sensor/time had a `DATA_NO=2` corrected row.
+Profile CLI smoke test also executed against an independent synthetic CSV. Assertions verified:
+
+- dataset provenance metadata emitted;
+- SHA-256 emitted;
+- two sensors counted;
+- 60-minute median cadence detected;
+- one corrected record counted;
+- validation `ok=true`.
 
 ### Verified
 
-- ingestion/validation code behavior against synthetic fixtures;
-- `DATA_NO=2` precedence implementation matches the public documentation rule;
-- validation fails on missing candidate target and invalid timestamps;
-- duplicates without `DATA_NO` are surfaced rather than silently resolved.
+- ingestion/validation behavior against synthetic fixtures;
+- documented `DATA_NO=2` precedence behavior;
+- source-profile evidence structure;
+- cadence/correction/sensor-count profiling logic;
+- current official dataset listing metadata as documented above.
 
-### Not verified
+### Not Verified
 
-- current public CSV fetch/download automation;
-- current `OA-22833` real file schema;
-- real-data row quality, cadence, missingness, and correction rate;
-- final forecasting target/horizon;
-- all model/dashboard/Docker/Playwright functionality.
+- current public CSV download/fetch execution;
+- current `OA-22833` real-file schema and row quality;
+- real-data cadence/missingness/correction distribution;
+- final target/horizon;
+- time-series model performance;
+- anomaly behavior on real data;
+- Dashboard, Docker, Playwright proof capture.
 
 ### Closure
 
-**HOLD** — source metadata/code foundation is sufficient, but Phase 1 cannot PASS until one current public `OA-22833` CSV is profiled and the source contract is frozen from observed evidence.
+**HOLD** — Phase 1 cannot PASS until one current public `OA-22833` CSV is actually profiled and the observed source contract is reviewed.
 
 ---
 
@@ -127,87 +136,67 @@ Also executed the profile CLI against an independently created synthetic fixture
 
 Candidate only:
 
-- target: hourly average temperature (`AVG_TP` or current documented equivalent);
+- target: hourly average temperature (`AVG_TP` or verified current equivalent);
 - horizon: +1 hour;
-- unit of prediction: per sensor;
+- prediction unit: per sensor;
 - split: chronological only.
 
-Do not promote this to the accepted target until the real-file source gate passes.
+Do not promote this to an accepted target until the real-file source gate passes.
 
 ---
 
 ## 6. MVP Definition of Done
 
-### A. Ingestion
+### Ingestion / provenance
 
-- [ ] A current documented public source is ingested reproducibly from a clean environment.
-- [ ] Source ID, retrieval method/date, and provenance are recorded.
-- [x] No proprietary/client input is permitted by repository rules.
+- [ ] Current documented public source ingested reproducibly.
+- [ ] Source ID, retrieval method/date, filename, size, and hash recorded.
+- [x] Repository clean-room rule prevents proprietary/client input.
 
-### B. Cleaning / validation
+### Cleaning / validation
 
-- [ ] Current real schema is recorded from observed public data.
-- [ ] Timestamp/timezone behavior is verified.
-- [x] Duplicate/correction handling exists for documented `DATA_NO` semantics.
+- [ ] Current real schema recorded from observed public data.
+- [ ] Timestamp/timezone behavior verified.
+- [x] Duplicate/correction handling implemented for documented `DATA_NO` semantics.
 - [x] Missing/invalid candidate fields produce explicit validation output.
-- [ ] Real-data validation report is captured.
+- [x] Profiler reports sensor count, cadence, correction rate, and numeric coverage.
+- [ ] Real-data validation profile captured.
 
-### C. Time-series features
+### Time-series features
 
 - [ ] Past-only lag/rolling/calendar features.
 - [ ] Deterministic generation.
-- [ ] Leakage checks for selected target/horizon.
+- [ ] Leakage checks for accepted target/horizon.
 
-### D. Forecasting
+### Forecasting
 
-- [ ] Final short-horizon target selected from observed public data.
+- [ ] Final target/horizon selected from observed public data.
 - [ ] Naive baseline.
 - [ ] At least one independent ML model evaluated against baseline.
 
-### E. Anomaly detection
+### Anomaly detection
 
 - [ ] Explicit independent anomaly definition.
 - [ ] Reproducible anomaly score/state.
 - [ ] Examples trace to public observations.
 
-### F. Time-based train/validation
+### Evaluation
 
-- [ ] Chronological boundaries.
-- [ ] No randomized split for primary time-series claim.
-- [ ] Evaluation period/sample counts recorded.
-
-### G. Evaluation
-
-- [ ] Metrics documented and appropriate.
-- [ ] Baseline-vs-model results reproducible.
+- [ ] Chronological train/validation boundaries.
+- [ ] No randomized split for primary claim.
+- [ ] Appropriate forecast metrics and sample counts recorded.
+- [ ] Baseline-vs-model result reproducible.
 - [ ] Limitations/failure cases recorded.
 
-### H. Dashboard
+### Dashboard / runtime / proof
 
-- [ ] Starts from documented command.
-- [ ] Displays source context, forecast, anomalies, evaluation context.
-- [ ] Contains no reused client/company assets.
+- [ ] Dashboard starts from documented command.
+- [ ] Dashboard shows source context, forecast, anomaly, and evaluation context.
+- [ ] Clean Docker build/start succeeds.
+- [ ] Playwright opens deterministic proof state and captures public-safe screenshots.
+- [ ] README setup matches actual execution.
 
-### I. Docker
-
-- [ ] Clean build succeeds.
-- [ ] MVP starts with documented Docker command.
-- [ ] Configuration/secrets externalized.
-
-### J. Proof screenshot flow
-
-- [ ] Playwright opens running dashboard.
-- [ ] Deterministic proof state exists.
-- [ ] Screenshots are reproducible and public-safe.
-
-### K. Proof package
-
-- [ ] README setup matches reality.
-- [ ] Actual execution evidence recorded.
-- [ ] VERIFIED and NOT VERIFIED claims remain distinct.
-- [ ] Known limitations visible.
-
-**READY TO SHOW** requires all MVP DoD items plus stable buyer-facing narrative/evidence.
+**READY TO SHOW** requires all MVP DoD items plus a stable buyer-facing narrative and reproducible public evidence.
 
 ---
 
@@ -215,27 +204,33 @@ Do not promote this to the accepted target until the real-file source gate passe
 
 ### Task 1 — Real public CSV profile
 
-Download one current `OA-22833` weekly CSV from Seoul Open Data Plaza and run `scripts/profile_sdot.py`.
+Profile one current `OA-22833` weekly CSV with:
 
-**Closure:** exact observed columns, identifiers, timestamp semantics, missingness, correction frequency, and coverage recorded.
+```bash
+PYTHONPATH=src python scripts/profile_sdot.py data/raw/<file>.csv \
+  --retrieved-at <retrieval-date> \
+  --output data/processed/source_profile.json
+```
 
-### Task 2 — Freeze source contract + deterministic normalized dataset
+**Closure:** observed columns, identifiers, timestamp parse behavior, coverage, missingness, cadence, correction rate, file hash, and source provenance recorded.
 
-Update the schema contract from observed evidence, select the final target/horizon, and produce a deterministic normalized output path with real-data validation evidence.
+### Task 2 — Freeze source contract + normalized dataset
+
+Review real profile, confirm timezone semantics from public documentation or source behavior, select final target/horizon, and implement deterministic normalized output.
 
 **Closure:** Phase 1 PASS.
 
 ### Task 3 — Baseline modeling
 
-Implement past-only features, chronological split, naive forecast baseline, first scikit-learn model, and simple independently defined anomaly scoring.
+Only after Task 2 PASS: implement leakage-safe features, chronological split, naive baseline, first scikit-learn forecast model, and simple independent anomaly scoring.
 
-**Closure:** reproducible evaluation beats or contextualizes baseline; limitations explicit.
+**Closure:** reproducible baseline evaluation with explicit limitations.
 
 ---
 
 ## 8. License decision
 
-No repository-level `LICENSE` file yet. Public visibility does not itself grant reuse rights. Revisit before intentional open-source distribution. Dataset usage must retain the source's attribution requirements.
+No repository-level `LICENSE` file yet. Public repository visibility is not itself an open-source grant. Dataset usage follows Seoul Metropolitan Government attribution requirements.
 
 ---
 
