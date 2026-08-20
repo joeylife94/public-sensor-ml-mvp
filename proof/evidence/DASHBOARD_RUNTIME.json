@@ -1,0 +1,64 @@
+{
+  "source_file": "S_DOT_ENV_2026.07.27-08.02.csv",
+  "verification": {
+    "automated_tests": {
+      "local_command": "PYTHONPATH=src pytest -q",
+      "local_result": "10 passed",
+      "ci_result": "success"
+    },
+    "http_runtime": {
+      "server": "uvicorn public_sensor_ml_mvp.dashboard.app:app --host 127.0.0.1 --port 8000",
+      "health_status": 200,
+      "health_payload": {
+        "ok": true,
+        "source_file": "S_DOT_ENV_2026.07.27-08.02.csv"
+      },
+      "dashboard_status": 200,
+      "dashboard_html_bytes": 4861035,
+      "expected_content_found": [
+        "Public Sensor ML MVP",
+        "Ridge MAE",
+        "Top statistical anomaly candidates",
+        "Source quality"
+      ]
+    },
+    "playwright_capture": {
+      "engine": "Playwright with system Chromium",
+      "command_mode": "scripts/capture_proof.py --fetch-html",
+      "running_dashboard_http_fetched": true,
+      "self_contained_html_rendered": true,
+      "title_verified": "Public Sensor ML MVP",
+      "proof_markers_verified": true,
+      "full_page_screenshot_generated": true,
+      "direct_browser_localhost_navigation": false,
+      "direct_navigation_limitation": "Current verification environment blocks Chromium navigation to localhost/127.0.0.1/0.0.0.0 with ERR_BLOCKED_BY_ADMINISTRATOR. The verified fallback fetches the running dashboard over HTTP, validates status 200, then renders the same self-contained HTML in Playwright before capture."
+    },
+    "docker_runtime": {
+      "verified": true,
+      "provider": "GitHub Actions",
+      "pull_request": 1,
+      "workflow_name": "verify",
+      "workflow_run_id": 32358089420,
+      "job_id": 96391539480,
+      "conclusion": "success",
+      "successful_steps": [
+        "Install test dependencies",
+        "Run automated tests",
+        "Generate public-contract-compatible fixture",
+        "Build Docker image",
+        "Start Docker dashboard",
+        "Verify container health and dashboard"
+      ],
+      "fixture_provenance": "independently generated public-contract-compatible synthetic fixture; no client/company data"
+    }
+  },
+  "closure": {
+    "source_contract": "PASS",
+    "forecast_baseline": "PASS",
+    "dashboard_http": "PASS",
+    "playwright_screenshot": "PASS",
+    "docker_runtime": "PASS",
+    "ready_to_show": "PASS",
+    "freeze": true
+  }
+}

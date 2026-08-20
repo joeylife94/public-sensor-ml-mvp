@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "public-sensor-ml-mvp"
+version = "0.3.0"
+description = "Independent public-data ML/Data proof project for urban sensor time series"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2,<3.0",
+  "numpy>=2.0,<3.0",
+  "scikit-learn>=1.6,<2.0",
+  "fastapi>=0.115,<1.0",
+  "uvicorn>=0.30,<1.0",
+  "plotly>=5.24,<7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<10.0",
+]
+proof = [
+  "playwright>=1.50,<2.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
