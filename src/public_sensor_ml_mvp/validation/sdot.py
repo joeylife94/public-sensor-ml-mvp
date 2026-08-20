@@ -1,5 +1,4 @@
-"""Validation and profiling for S-DoT tabular data."""
-
+"""Validation and profiling for the observed S-DoT weekly CSV contract."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
@@ -7,14 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-LEGACY_DOCUMENTED_COLUMNS = {
-    "MDL_NO", "SN", "MSRMT_HR", "RGN", "CGG", "DONG",
-    "MAX_TP", "AVG_TP", "MIN_TP",
-    "MAX_HUM", "AVG_HUM", "MIN_HUM",
-    "MAX_WSPD", "AVG_WSPD", "MIN_WSPD",
-    "MAX_WD", "AVG_WD", "MIN_WD",
-    "MAX_INILLU", "AVG_INILLU", "MIN_INILLU",
-}
+from public_sensor_ml_mvp.ingestion import parse_sdot_sensor_time, prepare_sdot_frame
 
 
 @dataclass(frozen=True)
@@ -36,152 +28,122 @@ class SdotValidationReport:
         return payload
 
 
-def _sensor_columns(frame: pd.DataFrame) -> list[str]:
-    return [column for column in ("SN", "MDL_NO") if column in frame.columns]
-
-
-def _duplicate_key(frame: pd.DataFrame) -> list[str]:
-    sensor_keys = _sensor_columns(frame)
-    if "MSRMT_HR" in frame.columns and sensor_keys:
-        return [*sensor_keys, "MSRMT_HR"]
-    return []
-
-
-def _cadence_minutes(frame: pd.DataFrame) -> pd.Series:
-    sensor_keys = _sensor_columns(frame)
-    if not sensor_keys or "MSRMT_HR" not in frame.columns:
-        return pd.Series(dtype="float64")
-
-    working = frame[[*sensor_keys, "MSRMT_HR"]].copy()
-    working["__ts"] = pd.to_datetime(working["MSRMT_HR"], errors="coerce")
-    working = working.dropna(subset=["__ts"]).drop_duplicates(subset=[*sensor_keys, "__ts"])
-    if working.empty:
-        return pd.Series(dtype="float64")
-
-    working = working.sort_values([*sensor_keys, "__ts"], kind="stable")
-    return (
-        working.groupby(sensor_keys, dropna=False)["__ts"]
-        .diff()
-        .dt.total_seconds()
-        .div(60)
-        .dropna()
-    )
-
-
 def profile_sdot_frame(frame: pd.DataFrame) -> dict[str, Any]:
+    prepared = prepare_sdot_frame(frame)
     profile: dict[str, Any] = {
-        "row_count": int(len(frame)),
-        "column_count": int(len(frame.columns)),
-        "columns": [str(column) for column in frame.columns],
+        "row_count": int(len(prepared)),
+        "column_count": int(len(prepared.columns)),
+        "columns": [str(column) for column in prepared.columns],
+        "source_encoding": frame.attrs.get("source_encoding"),
         "missing_fraction": {
-            str(column): float(frame[column].isna().mean()) for column in frame.columns
+            str(column): float(prepared[column].isna().mean()) for column in prepared.columns
         },
     }
 
-    sensor_keys = _sensor_columns(frame)
-    if sensor_keys:
-        profile["sensor_identifier_columns"] = sensor_keys
-        profile["unique_sensor_count"] = int(frame[sensor_keys].drop_duplicates().shape[0])
+    if "SN" in prepared.columns:
+        profile["sensor_count"] = int(prepared["SN"].nunique(dropna=True))
 
-    key = _duplicate_key(frame)
-    if key:
-        profile["measurement_key"] = key
-        profile["duplicate_measurement_rows"] = int(frame.duplicated(subset=key, keep=False).sum())
-
-    if "DATA_NO" in frame.columns:
-        numeric_data_no = pd.to_numeric(frame["DATA_NO"], errors="coerce")
+    if "DATA_NO" in prepared.columns:
+        numeric = pd.to_numeric(prepared["DATA_NO"], errors="coerce")
         profile["data_no_counts"] = {
-            str(key): int(value)
-            for key, value in numeric_data_no.value_counts(dropna=False).to_dict().items()
+            str(key): int(value) for key, value in numeric.value_counts(dropna=False).items()
         }
-        profile["corrected_record_rows"] = int((numeric_data_no == 2).sum())
-        profile["corrected_record_fraction"] = (
-            float((numeric_data_no == 2).mean()) if len(frame) else 0.0
-        )
+        profile["corrected_data_no_2_rows"] = int((numeric == 2).sum())
+        profile["corrected_data_no_2_fraction"] = float((numeric == 2).mean())
 
-    if "MSRMT_HR" in frame.columns:
-        parsed = pd.to_datetime(frame["MSRMT_HR"], errors="coerce")
-        valid = parsed.dropna()
+    if "MSRMT_HR" in prepared.columns:
+        parsed = parse_sdot_sensor_time(prepared["MSRMT_HR"])
         profile["timestamp_parse_success_fraction"] = float(parsed.notna().mean())
+        valid = parsed.dropna()
         if not valid.empty:
             profile["timestamp_min"] = valid.min().isoformat()
             profile["timestamp_max"] = valid.max().isoformat()
 
-        cadence = _cadence_minutes(frame)
-        if not cadence.empty:
-            profile["cadence_minutes_median"] = float(cadence.median())
-            profile["cadence_minutes_p95"] = float(cadence.quantile(0.95))
-            profile["cadence_one_hour_fraction"] = float(cadence.eq(60.0).mean())
+        if "SN" in prepared.columns:
+            cadence = (
+                pd.DataFrame({"SN": prepared["SN"].astype("string"), "TS": parsed})
+                .dropna()
+                .sort_values(["SN", "TS"])
+                .groupby("SN")["TS"]
+                .diff()
+                .dt.total_seconds()
+                .div(60)
+                .dropna()
+            )
+            if not cadence.empty:
+                profile["cadence_median_minutes"] = float(cadence.median())
+                profile["cadence_p95_minutes"] = float(cadence.quantile(0.95))
+                profile["cadence_exact_60_fraction"] = float((cadence == 60).mean())
+                profile["cadence_55_65_fraction"] = float(cadence.between(55, 65).mean())
 
-    for column in ("AVG_TP", "AVG_HUM", "AVG_WSPD", "AVG_INILLU"):
-        if column in frame.columns:
-            values = pd.to_numeric(frame[column], errors="coerce")
-            valid = values.dropna()
+    if "COLLECTED_AT" in prepared.columns:
+        collected = pd.to_datetime(prepared["COLLECTED_AT"], errors="coerce")
+        profile["collection_timestamp_parse_success_fraction"] = float(collected.notna().mean())
+        if "MSRMT_HR" in prepared.columns:
+            measured = parse_sdot_sensor_time(prepared["MSRMT_HR"])
+            delay = (collected - measured).dt.total_seconds().div(60)
+            valid_delay = delay.dropna()
+            if not valid_delay.empty:
+                profile["collection_delay_median_minutes"] = float(valid_delay.median())
+                profile["collection_delay_p95_minutes"] = float(valid_delay.quantile(0.95))
+                profile["collection_delay_max_minutes"] = float(valid_delay.max())
+                profile["aligned_within_30m_fraction"] = float(valid_delay.between(0, 30).mean())
+
+    for column in ("AVG_TP", "AVG_HUM"):
+        if column in prepared.columns:
+            values = pd.to_numeric(prepared[column], errors="coerce")
             profile[f"{column.lower()}_numeric_fraction"] = float(values.notna().mean())
+            profile[f"{column.lower()}_missing_fraction"] = float(values.isna().mean())
+            valid = values.dropna()
             if not valid.empty:
                 profile[f"{column.lower()}_min"] = float(valid.min())
                 profile[f"{column.lower()}_max"] = float(valid.max())
+
+    if {"SN", "MSRMT_HR"}.issubset(prepared.columns):
+        parsed = parse_sdot_sensor_time(prepared["MSRMT_HR"])
+        keys = pd.DataFrame({"SN": prepared["SN"].astype("string"), "TS": parsed})
+        profile["duplicate_measurement_rows"] = int(keys.duplicated(["SN", "TS"], keep=False).sum())
 
     return profile
 
 
 def validate_sdot_frame(frame: pd.DataFrame) -> SdotValidationReport:
+    prepared = prepare_sdot_frame(frame)
     errors: list[str] = []
     warnings: list[str] = []
     metrics = profile_sdot_frame(frame)
 
-    required = {"MSRMT_HR", "AVG_TP"}
-    missing = sorted(required.difference(frame.columns))
+    required = {"SN", "MSRMT_HR", "AVG_TP", "COLLECTED_AT", "DATA_NO"}
+    missing = sorted(required.difference(prepared.columns))
     if missing:
-        errors.append(f"Missing required candidate columns: {', '.join(missing)}")
+        errors.append(f"Missing required current-contract columns: {', '.join(missing)}")
 
-    if not ({"SN", "MDL_NO"} & set(frame.columns)):
-        errors.append("Missing sensor identifier: expected SN and/or MDL_NO")
-
-    if "MSRMT_HR" in frame.columns:
-        parsed = pd.to_datetime(frame["MSRMT_HR"], errors="coerce")
-        bad_timestamps = int(parsed.isna().sum())
-        if bad_timestamps:
-            errors.append(f"Unparseable MSRMT_HR rows: {bad_timestamps}")
+    if "MSRMT_HR" in prepared.columns:
+        parsed = parse_sdot_sensor_time(prepared["MSRMT_HR"])
+        bad = int(parsed.isna().sum())
+        if bad:
+            errors.append(f"Unparseable MSRMT_HR rows: {bad}")
         warnings.append(
-            "MSRMT_HR timezone semantics are not yet source-verified; timestamps remain timezone-naive"
+            "MSRMT_HR is timezone-naive in the observed CSV; the MVP uses local wall-clock chronology only"
         )
 
-    if "AVG_TP" in frame.columns:
-        numeric = pd.to_numeric(frame["AVG_TP"], errors="coerce")
-        invalid_numeric = int((frame["AVG_TP"].notna() & numeric.isna()).sum())
-        if invalid_numeric:
-            errors.append(f"Non-numeric AVG_TP rows: {invalid_numeric}")
-        missing_ratio = float(numeric.isna().mean())
-        metrics["avg_tp_missing_fraction"] = missing_ratio
-        if missing_ratio > 0.10:
-            warnings.append(f"AVG_TP missing fraction is high: {missing_ratio:.3f}")
+    if "AVG_TP" in prepared.columns:
+        values = pd.to_numeric(prepared["AVG_TP"], errors="coerce")
+        missing_fraction = float(values.isna().mean())
+        if missing_fraction > 0.20:
+            errors.append(f"AVG_TP numeric coverage too low: {1-missing_fraction:.3f}")
+        elif missing_fraction > 0.05:
+            warnings.append(f"AVG_TP missing/non-numeric fraction: {missing_fraction:.3f}")
 
-    key = _duplicate_key(frame)
-    if key:
-        duplicates = int(frame.duplicated(subset=key, keep=False).sum())
-        metrics["duplicate_measurement_rows"] = duplicates
-        if duplicates:
-            if "DATA_NO" in frame.columns:
-                warnings.append(
-                    f"Duplicate measurement-key rows detected ({duplicates}); apply documented DATA_NO correction precedence"
-                )
-            else:
-                warnings.append(
-                    f"Duplicate measurement-key rows detected ({duplicates}) without DATA_NO; source semantics require review"
-                )
-
-    unknown = sorted(set(frame.columns).difference(LEGACY_DOCUMENTED_COLUMNS | {"DATA_NO"}))
-    if unknown:
-        metrics["columns_not_in_legacy_contract"] = unknown
+    if metrics.get("aligned_within_30m_fraction", 1.0) < 0.90:
         warnings.append(
-            "Observed columns differ from the legacy documented schema; do not assume schema equivalence"
+            "Some sensor clocks are materially delayed versus collection time; modeling must filter clock-aligned rows"
         )
 
     return SdotValidationReport(
-        row_count=int(len(frame)),
-        column_count=int(len(frame.columns)),
-        columns=[str(column) for column in frame.columns],
+        row_count=int(len(prepared)),
+        column_count=int(len(prepared.columns)),
+        columns=[str(column) for column in prepared.columns],
         errors=errors,
         warnings=warnings,
         metrics=metrics,
