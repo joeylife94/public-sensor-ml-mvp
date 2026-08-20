@@ -1,0 +1,78 @@
+name: verify
+
+on:
+  push:
+    branches:
+      - feature/source-contract-ingestion
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run automated tests
+        run: pytest -q
+
+      - name: Generate public-contract-compatible fixture
+        run: |
+          mkdir -p .tmp
+          python - <<'PY'
+          import numpy as np
+          import pandas as pd
+
+          rows = []
+          for sensor, offset in [("A", 0.0), ("B", 1.0)]:
+              for i, ts in enumerate(pd.date_range("2026-07-27", periods=168, freq="h")):
+                  temp = 25 + offset + 5 * np.sin(2 * np.pi * ts.hour / 24) + i * 0.005
+                  rows.append({
+                      "모델명": "SDOT001",
+                      "시리얼": sensor,
+                      "센서 시간": ts.strftime("%Y-%m-%d_%H:%M:%S"),
+                      "평균 기온": temp,
+                      "평균 상대습도": 65.0,
+                      "데이터수집시간": (ts + pd.Timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S"),
+                      "데이터구분번호": 1,
+                  })
+          pd.DataFrame(rows).to_csv(
+              ".tmp/S_DOT_ENV_2026.07.27-08.02.csv", index=False, encoding="cp949"
+          )
+          PY
+
+      - name: Build Docker image
+        run: docker build -t public-sensor-ml-mvp:verify .
+
+      - name: Start Docker dashboard
+        run: |
+          docker run -d --name public-sensor-ml-mvp-verify \
+            -p 8000:8000 \
+            -v "$PWD/.tmp/S_DOT_ENV_2026.07.27-08.02.csv:/data/S_DOT_ENV_2026.07.27-08.02.csv:ro" \
+            public-sensor-ml-mvp:verify
+
+      - name: Verify container health and dashboard
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health > health.json; then
+              break
+            fi
+            sleep 2
+          done
+          cat health.json
+          grep -q '"ok":true' health.json
+          curl -fsS http://127.0.0.1:8000/ > dashboard.html
+          grep -q "Public Sensor ML MVP" dashboard.html
+          grep -q "Ridge MAE" dashboard.html
+          grep -q "Top statistical anomaly candidates" dashboard.html
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs public-sensor-ml-mvp-verify || true
