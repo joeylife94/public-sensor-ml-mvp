@@ -1,0 +1,48 @@
+{
+  "source": {
+    "dataset_id": "OA-22833",
+    "file": "S_DOT_ENV_2026.07.27-08.02.csv",
+    "file_size_bytes": 45773209,
+    "sha256": "428dcbda91ca1bdbfe0966fa4a9ca0f5f399348e745acfeb113bd9119d959709"
+  },
+  "profile": {
+    "row_count": 195984,
+    "column_count": 59,
+    "source_encoding": "cp949",
+    "sensor_count": 1166,
+    "timestamp_parse_success_fraction": 1.0,
+    "timestamp_min": "2026-07-26T00:00:00",
+    "timestamp_max": "2026-08-02T23:07:00",
+    "cadence_median_minutes": 60.0,
+    "cadence_p95_minutes": 60.0,
+    "cadence_exact_60_fraction": 0.9866028806373128,
+    "cadence_55_65_fraction": 0.9980853925201983,
+    "collection_timestamp_parse_success_fraction": 1.0,
+    "collection_delay_median_minutes": 0.7666666666666667,
+    "collection_delay_p95_minutes": 1227.2,
+    "collection_delay_max_minutes": 1476.6,
+    "aligned_within_30m_fraction": 0.7594854682014859,
+    "avg_tp_numeric_fraction": 0.9124010123275369,
+    "avg_tp_missing_fraction": 0.08759898767246306,
+    "avg_tp_min": 19.0,
+    "avg_tp_max": 42.8,
+    "avg_hum_numeric_fraction": 0.9348569270960895,
+    "avg_hum_missing_fraction": 0.06514307290391053,
+    "duplicate_measurement_rows": 0,
+    "corrected_data_no_2_rows": 0
+  },
+  "validation": {
+    "ok": true,
+    "errors": [],
+    "warnings": [
+      "MSRMT_HR is timezone-naive in the observed CSV; the MVP uses local wall-clock chronology only",
+      "AVG_TP missing/non-numeric fraction: 0.088",
+      "Some sensor clocks are materially delayed versus collection time; modeling must filter clock-aligned rows"
+    ]
+  },
+  "notes": {
+    "raw_header_count": 59,
+    "ambiguous_duplicate_headers_preserved": true,
+    "sensor_time_timezone": "timezone-naive source; local wall-clock chronology only"
+  }
+}
