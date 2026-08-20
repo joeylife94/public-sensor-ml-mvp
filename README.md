@@ -6,7 +6,7 @@ Independent, public-data-only End-to-End ML/Data proof using Seoul S-DoT urban s
 
 ## Current status
 
-**Real source + baseline ML VERIFIED. Full MVP is not READY TO SHOW yet.**
+**READY TO SHOW — verified public-data MVP.**
 
 Verified against public source file `S_DOT_ENV_2026.07.27-08.02.csv`:
 
@@ -17,7 +17,10 @@ Verified against public source file `S_DOT_ENV_2026.07.27-08.02.csv`:
 - +1h per-sensor average-temperature forecasting;
 - chronological last-24h validation;
 - naive vs Ridge baseline;
-- residual-based anomaly candidates.
+- residual-based anomaly candidates;
+- executable FastAPI + Plotly dashboard;
+- Docker build/start/health verification in GitHub Actions;
+- Playwright-based deterministic proof capture.
 
 Result on the first verified one-week cohort (`672` complete clock-aligned sensors):
 
@@ -42,22 +45,50 @@ Verified file SHA-256:
 
 `428dcbda91ca1bdbfe0966fa4a9ca0f5f399348e745acfeb113bd9119d959709`
 
-Detailed source contract: `docs/SOURCE_CONTRACT.md`  
-Evidence: `proof/evidence/SOURCE_PROFILE.json`, `proof/evidence/BASELINE_EVALUATION.json`
+Detailed source contract: `docs/SOURCE_CONTRACT.md`
 
-## Run baseline verification
+Evidence:
+
+- `proof/evidence/SOURCE_PROFILE.json`
+- `proof/evidence/BASELINE_EVALUATION.json`
+- `proof/evidence/DASHBOARD_RUNTIME.json`
+- `proof/evidence/PR_VERIFICATION_NOTE.md`
+
+## Run locally
 
 Place the public weekly CSV outside Git, for example under `data/raw/`, then:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev,proof]"
 
 PYTHONPATH=src pytest -q
+SDOT_CSV_PATH=data/raw/S_DOT_ENV_2026.07.27-08.02.csv \
+  uvicorn public_sensor_ml_mvp.dashboard.app:app --host 127.0.0.1 --port 8000
+```
+
+Baseline evidence can be regenerated with:
+
+```bash
 PYTHONPATH=src python scripts/evaluate_baseline.py \
   data/raw/S_DOT_ENV_2026.07.27-08.02.csv \
   --output data/processed/baseline_evaluation.json
+```
+
+Proof capture:
+
+```bash
+python scripts/capture_proof.py --url http://127.0.0.1:8000/ --fetch-html
+```
+
+Docker:
+
+```bash
+docker build -t public-sensor-ml-mvp .
+docker run --rm -p 8000:8000 \
+  -v "$PWD/data/raw/S_DOT_ENV_2026.07.27-08.02.csv:/data/S_DOT_ENV_2026.07.27-08.02.csv:ro" \
+  public-sensor-ml-mvp
 ```
 
 ## MVP scope
@@ -69,9 +100,16 @@ PYTHONPATH=src python scripts/evaluate_baseline.py \
 - [x] statistical anomaly detection baseline
 - [x] chronological train / validation
 - [x] model evaluation
-- [ ] Dashboard
-- [ ] Docker runtime
-- [ ] Playwright proof screenshots
+- [x] executable dashboard
+- [x] Docker runtime verification
+- [x] Playwright proof screenshot flow
+
+## Limitations
+
+- Forecast evidence covers one public weekly file, not long-horizon production generalization.
+- Statistical anomaly candidates do not have ground-truth fault labels.
+- Source timestamps are timezone-naive local wall-clock values.
+- Some raw sensor clocks materially lag collection time; the modeling cohort filters for clock alignment.
 
 `docs/PROJECT_MASTER.md` is the authoritative tracking document.
 
