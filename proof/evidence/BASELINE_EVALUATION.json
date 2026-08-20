@@ -1,0 +1,40 @@
+{
+  "source": {
+    "dataset_id": "OA-22833",
+    "file": "S_DOT_ENV_2026.07.27-08.02.csv",
+    "file_size_bytes": 45773209,
+    "sha256": "428dcbda91ca1bdbfe0966fa4a9ca0f5f399348e745acfeb113bd9119d959709"
+  },
+  "problem": {
+    "target": "AVG_TP",
+    "horizon_hours": 1,
+    "cohort_rule": "168 complete hourly observations, numeric AVG_TP/AVG_HUM, collection delay 0-30 minutes",
+    "split": "last 24 target hours as chronological validation"
+  },
+  "forecast_evaluation": {
+    "train_rows": 79968,
+    "validation_rows": 16128,
+    "sensor_count": 672,
+    "train_target_start": "2026-07-28T01:00:00",
+    "train_target_end": "2026-08-01T23:00:00",
+    "validation_target_start": "2026-08-02T00:00:00",
+    "validation_target_end": "2026-08-02T23:00:00",
+    "naive_mae": 0.6480220734126984,
+    "naive_rmse": 0.8747083555913193,
+    "ridge_mae": 0.3577603627027223,
+    "ridge_rmse": 0.50432029070191,
+    "mae_improvement_fraction": 0.44791948086175826,
+    "rmse_improvement_fraction": 0.4234417820772045
+  },
+  "anomaly": {
+    "definition": "absolute Ridge forecast residual above 99th percentile of training absolute residuals",
+    "training_threshold": 1.3738731764879957,
+    "validation_anomaly_count": 368,
+    "validation_anomaly_fraction": 0.022817460317460316,
+    "ground_truth_label_available": false
+  },
+  "source_gate": {
+    "validation_ok": true,
+    "eligible_sensor_count": 672
+  }
+}
