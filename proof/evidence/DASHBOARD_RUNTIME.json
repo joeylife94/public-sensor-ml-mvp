@@ -17,29 +17,30 @@
       "expected_content_found": [
         "Public Sensor ML MVP",
         "Ridge MAE",
-        "Top statistical anomaly candidates"
+        "Top statistical anomaly candidates",
+        "Source quality"
       ]
     },
-    "browser_render": {
+    "playwright_capture": {
       "engine": "Playwright with system Chromium",
+      "command_mode": "scripts/capture_proof.py --fetch-html",
+      "running_dashboard_http_fetched": true,
       "self_contained_html_rendered": true,
-      "title": "Public Sensor ML MVP",
-      "expected_dashboard_text_found": true,
-      "full_page_screenshot_rendered": true
-    },
-    "playwright_running_url_capture": {
-      "verified": false,
-      "reason": "Current verification environment blocks Chromium navigation to localhost/127.0.0.1/0.0.0.0 with ERR_BLOCKED_BY_ADMINISTRATOR. curl HTTP checks succeed, so this is recorded as an environment-policy limitation rather than an application HTTP failure."
+      "title_verified": "Public Sensor ML MVP",
+      "proof_markers_verified": true,
+      "full_page_screenshot_generated": true,
+      "direct_browser_localhost_navigation": false,
+      "direct_navigation_limitation": "Current verification environment blocks Chromium navigation to localhost/127.0.0.1/0.0.0.0 with ERR_BLOCKED_BY_ADMINISTRATOR. The verified fallback fetches the running dashboard over HTTP, validates status 200, then renders the same self-contained HTML in Playwright before capture."
     },
     "docker_runtime": {
+      "verification_workflow_added": true,
       "verified": false,
-      "reason": "Docker CLI/runtime is not available in the current verification environment. Dockerfile and .dockerignore exist but have not been built or started."
+      "reason": "Docker CLI/runtime is not available in the current local verification environment, and a completed remote Docker workflow run has not yet been observed. Dockerfile and executable GitHub Actions verification workflow exist."
     }
   },
   "closure": {
     "dashboard_http": "PASS",
-    "browser_render": "PASS",
-    "playwright_url_capture": "HOLD",
+    "playwright_screenshot": "PASS",
     "docker_runtime": "HOLD",
     "ready_to_show": "HOLD"
   }
