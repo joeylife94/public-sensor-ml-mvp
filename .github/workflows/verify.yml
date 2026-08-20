@@ -3,7 +3,7 @@ name: verify
 on:
   push:
     branches:
-      - feature/source-contract-ingestion
+      - main
   pull_request:
     branches:
       - main
