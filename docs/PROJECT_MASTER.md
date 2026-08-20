@@ -2,246 +2,204 @@
 
 **Role:** Authoritative project tracking document  
 **Repository:** `joeylife94/public-sensor-ml-mvp`  
-**Overall proof level:** NOT VERIFIED  
-**Current phase:** Phase 1 — source-contract + ingestion/validation foundation  
-**Phase 0 scaffold gate:** PASS  
-**Phase 1 real-data gate:** HOLD
+**MVP closure:** HOLD  
+**Ready to Show:** NO  
+**Current phase:** Phase 2 complete — real source + baseline modeling verified; Dashboard/runtime/proof capture pending
 
 ---
 
 ## 1. Objective
 
-Build an independent, public-data-only proof asset demonstrating:
+Build an independent public-data-only ML/Data proof:
 
-`public urban sensor data -> ingestion -> validation/cleaning -> time-series features -> short-horizon forecast -> anomaly detection -> time-based evaluation -> dashboard -> reproducible proof capture`
+`public urban sensor data -> ingestion -> validation -> time-series features -> +1h forecast -> anomaly candidates -> chronological evaluation -> dashboard -> Docker -> reproducible screenshots`
 
 Buyer-facing outcome:
 
 > A runnable end-to-end ML/Data system that collects and validates public sensor data, produces time-series forecasting and anomaly-detection results, and exposes them through a dashboard.
 
-The target is the smallest useful, reproducible proof. Do not expand scope for portfolio volume.
-
 ---
 
 ## 2. Clean-room boundary
 
-This repository is completely independent from client/employer work.
+Completely independent from all client/employer projects.
 
-### Prohibited
+Prohibited: client/company code, data, models, requirements, schemas, UI, screenshots, documents, metrics, architecture artifacts, derived samples, and the road-icing prediction problem definition.
 
-- client/company source code, repositories, datasets, derived data, models, checkpoints, prompts, notebooks, metrics;
-- client/company requirements, documents, UI, screenshots, diagrams, reports, or deliverables;
-- proprietary schemas, architecture artifacts, operational workflows, naming conventions, or hidden assumptions;
-- the road-icing prediction problem definition.
-
-### Allowed
-
-- publicly accessible datasets and APIs;
-- independently written code/documentation;
-- open-source libraries under their licenses;
-- independently designed UI, evaluation, and proof assets.
-
-If provenance is unclear, treat the asset as prohibited until independently verified.
+Allowed: publicly accessible data/APIs, independently written code/docs, properly licensed open-source libraries, independently designed proof assets.
 
 ---
 
-## 3. Source contract
+## 3. Phase gates
 
-Primary source: Seoul S-DoT environmental information (real-time), dataset `OA-22833`.
-
-### Verified from official public metadata
-
-- publisher: Seoul Metropolitan Government;
-- approximately 1,170 sensors;
-- hourly environmental minimum/maximum/average measurements;
-- weekly CSV exports;
-- Korea Open Government License Type 1 / attribution;
-- `DATA_NO=1` = real-time collection;
-- `DATA_NO=2` = delayed/corrected record;
-- `DATA_NO=2` is final when 1 and 2 coexist for the same sensor and measurement time;
-- dataset update date observed on 2026-08-20: `2026-08-10`;
-- latest weekly file visible on that date: `S_DOT_ENV_2026.07.27-08.02.csv` (44.7 MB, modified 2026-08-10).
-
-### Not yet verified from a current real CSV
-
-- exact `OA-22833` column set;
-- timestamp format/timezone semantics;
-- current sensor identifier field(s);
-- actual missing-value conventions/rates;
-- cadence gaps and correction frequency;
-- final forecasting target/horizon suitability.
-
-Legacy `OA-15969` / `IotVdata017` is reference-only and must not be treated as the current contract.
+| Gate | Status | Evidence |
+|---|---|---|
+| Phase 0 repository/scaffold | PASS | README + initial repository |
+| Phase 1 real source contract | PASS | `proof/evidence/SOURCE_PROFILE.json`, `docs/SOURCE_CONTRACT.md` |
+| Phase 2 ingestion/validation | PASS | 9 unit tests + real CSV validation |
+| Phase 2 chronological forecast baseline | PASS | `proof/evidence/BASELINE_EVALUATION.json` |
+| Phase 2 anomaly baseline | PASS | residual-threshold evidence; no ground-truth anomaly label claim |
+| Dashboard | NOT VERIFIED | not implemented |
+| Docker runtime | NOT VERIFIED | not implemented |
+| Playwright proof screenshot | NOT VERIFIED | not implemented |
+| Buyer-facing READY TO SHOW | HOLD | runtime + screenshot evidence missing |
 
 ---
 
-## 4. Current implementation
+## 4. Real source evidence
 
-### Changed
+Verified file: `S_DOT_ENV_2026.07.27-08.02.csv`
 
-- public CSV loader with encoding fallbacks;
-- source-column normalization preserving unknown fields;
-- documented `DATA_NO` final-record resolution;
-- validation/profiling for columns, missingness, numeric coverage, timestamps, and duplicate keys;
-- profiler now records sensor identifier columns and unique sensor count;
-- profiler now records median/p95 cadence and one-hour cadence fraction;
-- profiler now records corrected-record count/fraction;
-- profile CLI now records dataset ID, source URL, filename, file size, SHA-256, optional retrieval timestamp, and profile-generation timestamp;
-- source documentation updated with current official listing metadata.
+- size: `45,773,209` bytes
+- SHA-256: `428dcbda91ca1bdbfe0966fa4a9ca0f5f399348e745acfeb113bd9119d959709`
+- encoding: CP949
+- 195,984 rows / 59 columns / 1,166 sensors
+- sensor timestamp parse: 100% with the two observed timestamp spellings
+- exact 60-minute cadence: 98.66%
+- `AVG_TP` numeric coverage: 91.24%
+- clock aligned within 30 minutes: 75.95%
+- `DATA_NO=2`: zero rows in this file
 
-### Executed
+Known source-quality issue: some sensor clocks are delayed by hours, and the raw header contains duplicated/ambiguous labels. Modeling filters clock-aligned rows and canonicalizes only unambiguous fields.
 
-Local verification executed against independently created synthetic fixtures:
+---
+
+## 5. Accepted forecasting question
+
+**Target:** hourly average temperature (`AVG_TP`)  
+**Horizon:** +1 hour  
+**Unit:** per sensor  
+**Evaluation:** chronological only
+
+First baseline cohort:
+
+- numeric `AVG_TP` + `AVG_HUM`;
+- collection delay 0-30 minutes;
+- unique sensor-hour;
+- complete 168-hour weekly series.
+
+Eligible sensors: `672`.
+
+### Feature contract
+
+Past/current information only:
+
+- current temperature;
+- lag 1 / 2 / 24;
+- rolling mean 3 / 6 / 24;
+- current humidity;
+- target-hour sine/cosine.
+
+No future measured value is used as a feature.
+
+---
+
+## 6. Executed evaluation
+
+Final local verification against the uploaded real public CSV:
 
 ```text
 PYTHONPATH=src pytest -q
-........ [100%]
-8 passed
+......... [100%]
+9 passed
 ```
 
-Profile CLI smoke test also executed against an independent synthetic CSV. Assertions verified:
+Chronological evaluation:
 
-- dataset provenance metadata emitted;
-- SHA-256 emitted;
-- two sensors counted;
-- 60-minute median cadence detected;
-- one corrected record counted;
-- validation `ok=true`.
+- train rows: `79,968`
+- validation rows: `16,128`
+- train target window: `2026-07-28 01:00` through `2026-08-01 23:00`
+- validation target window: `2026-08-02 00:00` through `2026-08-02 23:00`
+
+Naive last-value baseline:
+
+- MAE `0.6480°C`
+- RMSE `0.8747°C`
+
+Ridge baseline:
+
+- MAE `0.3578°C`
+- RMSE `0.5043°C`
+- MAE improvement vs naive: `44.79%`
+- RMSE improvement vs naive: `42.34%`
+
+These results prove only this one-week public-data baseline under the documented cohort/filter. They are not claimed as production performance.
+
+---
+
+## 7. Anomaly baseline
+
+Definition:
+
+> Validation observations whose absolute Ridge forecast residual exceeds the 99th percentile of training absolute residuals.
+
+- threshold: `1.3739°C`
+- validation anomaly candidates: `368 / 16,128`
+- candidate rate: `2.28%`
+- ground-truth anomaly/fault labels: **not available**
+
+Therefore this is a reproducible statistical anomaly detector, not a verified physical-fault classifier.
+
+---
+
+## 8. Changed / Executed / Verified / Not Verified
+
+### Changed
+
+- current Korean OA-22833 header adapter;
+- mixed timestamp parser;
+- real-source validation/profile logic;
+- leakage-safe temperature feature builder;
+- chronological naive + Ridge evaluation;
+- residual anomaly baseline;
+- source and baseline evidence JSON.
+
+### Executed
+
+- real public weekly CSV profile;
+- full baseline evaluation;
+- 9 automated tests.
 
 ### Verified
 
-- ingestion/validation behavior against synthetic fixtures;
-- documented `DATA_NO=2` precedence behavior;
-- source-profile evidence structure;
-- cadence/correction/sensor-count profiling logic;
-- current official dataset listing metadata as documented above.
+- real current schema subset required by the MVP;
+- data quality/cadence relevant to target selection;
+- source provenance via file hash;
+- +1h temperature forecasting baseline;
+- statistical anomaly-candidate generation.
 
 ### Not Verified
 
-- current public CSV download/fetch execution;
-- current `OA-22833` real-file schema and row quality;
-- real-data cadence/missingness/correction distribution;
-- final target/horizon;
-- time-series model performance;
-- anomaly behavior on real data;
-- Dashboard, Docker, Playwright proof capture.
-
-### Closure
-
-**HOLD** — Phase 1 cannot PASS until one current public `OA-22833` CSV is actually profiled and the observed source contract is reviewed.
+- generalization beyond this one-week file;
+- labeled anomaly accuracy;
+- Dashboard;
+- Docker;
+- Playwright screenshot flow;
+- final buyer-facing proof package.
 
 ---
 
-## 5. Provisional ML question
+## 9. Definition of Done remaining
 
-Candidate only:
-
-- target: hourly average temperature (`AVG_TP` or verified current equivalent);
-- horizon: +1 hour;
-- prediction unit: per sensor;
-- split: chronological only.
-
-Do not promote this to an accepted target until the real-file source gate passes.
-
----
-
-## 6. MVP Definition of Done
-
-### Ingestion / provenance
-
-- [ ] Current documented public source ingested reproducibly.
-- [ ] Source ID, retrieval method/date, filename, size, and hash recorded.
-- [x] Repository clean-room rule prevents proprietary/client input.
-
-### Cleaning / validation
-
-- [ ] Current real schema recorded from observed public data.
-- [ ] Timestamp/timezone behavior verified.
-- [x] Duplicate/correction handling implemented for documented `DATA_NO` semantics.
-- [x] Missing/invalid candidate fields produce explicit validation output.
-- [x] Profiler reports sensor count, cadence, correction rate, and numeric coverage.
-- [ ] Real-data validation profile captured.
-
-### Time-series features
-
-- [ ] Past-only lag/rolling/calendar features.
-- [ ] Deterministic generation.
-- [ ] Leakage checks for accepted target/horizon.
-
-### Forecasting
-
-- [ ] Final target/horizon selected from observed public data.
-- [ ] Naive baseline.
-- [ ] At least one independent ML model evaluated against baseline.
-
-### Anomaly detection
-
-- [ ] Explicit independent anomaly definition.
-- [ ] Reproducible anomaly score/state.
-- [ ] Examples trace to public observations.
-
-### Evaluation
-
-- [ ] Chronological train/validation boundaries.
-- [ ] No randomized split for primary claim.
-- [ ] Appropriate forecast metrics and sample counts recorded.
-- [ ] Baseline-vs-model result reproducible.
-- [ ] Limitations/failure cases recorded.
-
-### Dashboard / runtime / proof
-
-- [ ] Dashboard starts from documented command.
-- [ ] Dashboard shows source context, forecast, anomaly, and evaluation context.
-- [ ] Clean Docker build/start succeeds.
-- [ ] Playwright opens deterministic proof state and captures public-safe screenshots.
-- [ ] README setup matches actual execution.
-
-**READY TO SHOW** requires all MVP DoD items plus a stable buyer-facing narrative and reproducible public evidence.
+- [x] public source ingestion/profile
+- [x] validation + source-quality evidence
+- [x] time-series feature generation
+- [x] +1h forecast
+- [x] anomaly-state baseline
+- [x] chronological train/validation
+- [x] model evaluation
+- [ ] executable Dashboard
+- [ ] Docker build/start verified
+- [ ] Playwright deterministic screenshot verified
+- [ ] README/runtime instructions verified end-to-end
+- [ ] buyer-facing evidence/screenshots packaged
 
 ---
 
-## 7. Next 3 tasks
+## 10. Next 3 tasks
 
-### Task 1 — Real public CSV profile
+1. Build the smallest Streamlit dashboard from the verified source/evaluation pipeline: source quality, forecast comparison, anomaly candidates.
+2. Add Docker runtime with a mounted public CSV path and verify clean build/start.
+3. Add deterministic Playwright proof route/state, capture screenshots, then decide READY TO SHOW vs HOLD.
 
-Profile one current `OA-22833` weekly CSV with:
-
-```bash
-PYTHONPATH=src python scripts/profile_sdot.py data/raw/<file>.csv \
-  --retrieved-at <retrieval-date> \
-  --output data/processed/source_profile.json
-```
-
-**Closure:** observed columns, identifiers, timestamp parse behavior, coverage, missingness, cadence, correction rate, file hash, and source provenance recorded.
-
-### Task 2 — Freeze source contract + normalized dataset
-
-Review real profile, confirm timezone semantics from public documentation or source behavior, select final target/horizon, and implement deterministic normalized output.
-
-**Closure:** Phase 1 PASS.
-
-### Task 3 — Baseline modeling
-
-Only after Task 2 PASS: implement leakage-safe features, chronological split, naive baseline, first scikit-learn forecast model, and simple independent anomaly scoring.
-
-**Closure:** reproducible baseline evaluation with explicit limitations.
-
----
-
-## 8. License decision
-
-No repository-level `LICENSE` file yet. Public repository visibility is not itself an open-source grant. Dataset usage follows Seoul Metropolitan Government attribution requirements.
-
----
-
-## 9. Change discipline
-
-Every meaningful update records:
-
-- **Changed**
-- **Executed**
-- **Verified**
-- **Not Verified**
-- **Closure:** PASS / HOLD / FAIL / DEFER / FREEZE
-
-Never mark planned functionality complete. Agent self-report is not final proof.
+Do not add cloud infrastructure, auth, deep learning, or extra portfolio features before these gates close.
